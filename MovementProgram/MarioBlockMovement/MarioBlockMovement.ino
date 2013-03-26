@@ -9,15 +9,15 @@ void handleFlowerState();
 void handleShroomState();
 
 //OUTPUT PIN ASSIGNMENTS
-const int SHROOM_HOR_DIR_PIN = 0;
+const int SHROOM_HOR_DIR_PIN = A5;
 const int COIN_MOTOR_POWER_PIN = 13;
 const int FLOWER_MOTOR_POWER_PIN = 11;
-const int SHROOM_HOR_POWER_PIN = 3;
+const int SHROOM_HOR_POWER_PIN = A2;
 const int SHROOM_VER_POWER_PIN = 2;
 
 //INPUT PIN ASSIGNMENTS
 const int SHROOM_SENSOR_LEFT_PIN = 5;
-const int SHROOM_SENSOR_RIGTH_PIN = 6 ; 
+const int SHROOM_SENSOR_RIGHT_PIN = 6 ; 
 const int COIN_PUSH_PIN = 12;//7;
 const int FLOWER_PUSH_PIN = 8;
 const int SHROOM_PUSH_PIN = 9;
@@ -26,8 +26,9 @@ const unsigned long COIN_INTERVAL = 6000;
 const unsigned long FLOWER_INTERVAL = 6000;
 const unsigned long SHROOM_INTERVAL = 6000;
 
-const bool LEFT = HIGH;
-const bool RIGHT = LOW;
+const bool LEFT = 0;
+const bool RIGHT = 255;
+bool shroomMoving = false;
 
 //Typedefs
 typedef enum{
@@ -56,7 +57,7 @@ typedef enum{
 
 //Global Variables
 int pushButtonPins[] = {COIN_PUSH_PIN,FLOWER_PUSH_PIN, SHROOM_PUSH_PIN};
-int shroomSensorPins[] = {SHROOM_SENSOR_LEFT_PIN, SHROOM_SENSOR_RIGTH_PIN};
+int shroomSensorPins[] = {SHROOM_SENSOR_LEFT_PIN, SHROOM_SENSOR_RIGHT_PIN};
 
 int pushButtonValues[3] = {LOW,LOW,LOW};
 COIN_STATE machineCoinState;
@@ -85,12 +86,15 @@ void setup() {
 
   //Shroom stuff
   pinMode(SHROOM_SENSOR_LEFT_PIN, INPUT_PULLUP);
-  pinMode(SHROOM_SENSOR_RIGTH_PIN, INPUT_PULLUP);
+  pinMode(SHROOM_SENSOR_RIGHT_PIN, INPUT_PULLUP);
 
   machineCoinState == STATE_COIN_DOWN;
+  machineShroomVerState == STATE_SHROOM_DOWN;
+  machineShroomHorState == STATE_SHROOM_LEFT;
+
   digitalWrite(COIN_MOTOR_POWER_PIN, HIGH); //Stop coin motor.
   digitalWrite(SHROOM_VER_POWER_PIN, HIGH); //Stop coin motor.
-  digitalWrite(SHROOM_HOR_POWER_PIN, HIGH); //Stop coin motor.
+  analogWrite(SHROOM_HOR_POWER_PIN, HIGH); //Stop coin motor.
   digitalWrite(FLOWER_MOTOR_POWER_PIN, HIGH); //Stop coin motor.
 }
 
@@ -125,7 +129,6 @@ void loop() {
   }
    
 //CODE BELOW IS FOR FLOWER STUFF
-
   if ( digitalRead(FLOWER_PUSH_PIN)){
     //Serial.println("flower button pushed");
   }else{
@@ -157,119 +160,102 @@ void loop() {
   }else{
     Serial.println("shroom button not pushed");
   }
+    machineShroomVerState== STATE_SHROOM_DOWN;
+if ( machineShroomVerState == STATE_SHROOM_DOWN ){
+    Serial.println("state Down");
+  }else{
+    Serial.println("state UP");
+  }
 
-  if(digitalRead(SHROOM_PUSH_PIN) && machineShroomVerState == STATE_SHROOM_DOWN){
-    // Move the shroom up only when the shroom is down.
+  if ( machineShroomHorState == STATE_SHROOM_LEFT ){
+    Serial.println("state left");
+  }else{
+    Serial.println("state right");
+  }
+
+
+  if(digitalRead(SHROOM_PUSH_PIN) && shroomMoving == false){
+    // Move the shroom up only when the shroom is down and right.
     Serial.println("shroom button pushed move shroom up");
+    shroomMoving = true;
+    digitalWrite(SHROOM_VER_POWER_PIN, LOW); // Move shroom up
     machineShroomVerState = STATE_SHROOM_UP;
-    shroomPreviousMillis = millis();
-    digitalWrite(SHROOM_VER_POWER_PIN, LOW);
+    delay(3000);
+    analogWrite(SHROOM_HOR_POWER_PIN, 255);
+    digitalWrite(SHROOM_HOR_DIR_PIN, RIGHT);
+    delay(500);
   }
 
-  if(machineShroomVerState == STATE_SHROOM_UP){
+  if(machineShroomVerState == STATE_SHROOM_UP ){
     // shroom is already up, need to check when to put it down.
-    Serial.println("shroom is held up. check if need to put down");
-    if( digitalRead(SHROOM_SENSOR_LEFT_PIN) {
-      //Shroom reach to the right, should bring it down now.
+   // Serial.println("shroom is held up. check if need to put down");
+    if( digitalRead(SHROOM_SENSOR_RIGHT_PIN) == LOW) {
+      digitalWrite(SHROOM_VER_POWER_PIN, HIGH); // Move the shroom down
       machineShroomVerState = STATE_SHROOM_DOWN;
-      digitalWrite(SHROOM_VER_POWER_PIN, HIGH);
-      Serial.println("Times up put shroom down. >>>>>>>>>>>>>>>");
-    }
+      Serial.println("Reached the right side, put the shroom down. >>>>>>>>>>>>>>>");
+      digitalWrite(SHROOM_HOR_DIR_PIN,LEFT);  // Move to other side.
+      analogWrite(SHROOM_HOR_POWER_PIN, 0); //Turn off chain
+      delay(1500); //Wait for shroom to drop
+      analogWrite(SHROOM_HOR_POWER_PIN, 255); //Turn on chain
+  }else{
+      //Serial.println("Shroom not up yet<<<<<");
+    }    
   }
+ 
+  if( digitalRead(SHROOM_SENSOR_LEFT_PIN) == LOW){
+    digitalWrite(SHROOM_VER_POWER_PIN, HIGH);
+    analogWrite(SHROOM_HOR_POWER_PIN, 0);
+    shroomMoving = false;
+  } 
+
+//  if( machineShroomVerState == STATE_SHROOM_DOWN && machineShroomHorState == STATE_SHROOM_RIGHT){
+//    //Serial.println(" Shroom is on the right , bing it to left.");
+//    machineShroomHorState = STATE_SHROOM_RIGHT; // Already on the right
+//
+//    //machineShroomHorState = STATE_SHROOM_LEFT;
+//    shroomPreviousMillis = millis();
+//    analogWrite(SHROOM_HOR_POWER_PIN, LEFT);
+//    delay(10); 
+//  }
+//
+//  if( machineShroomVerState == STATE_SHROOM_RIGHT){
+//    //Serial.println(" Shroom is on the right , bing it to left.");
+//    machineShroomHorState = STATE_SHROOM_LEFT;
+//    shroomPreviousMillis = millis();
+//    analogWrite(SHROOM_HOR_POWER_PIN, LOW);
+//  }
 
 } //end of loop
 
-//void readPushButtons(){
-//  for(int pin=0; pin<3 ; pin++){
-//    pushButtonValues[pin] = digitalRead(pushButtonPins[pin]);
+//void printPushButtonsValues(){
+//  for(int pin =0; pin<3 ;pin++){
+//    Serial.print("pin");
+//    Serial.print(pin);
+//    Serial.print("is");
+//    Serial.print(pushButtonValues[pin]);
+//    Serial.println();  
 //  }
 //}
 
-void printPushButtonsValues(){
-  for(int pin =0; pin<3 ;pin++){
-    Serial.print("pin");
-    Serial.print(pin);
-    Serial.print("is");
-    Serial.print(pushButtonValues[pin]);
-    Serial.println();  
-  }
-}
-
-void handlePushButtonState(){
-  if (pushButtonValues[0] > 512 ){ 
-    Serial.println("Coin button pushed");
-    machineCoinState = STATE_COIN_UP;
-  }
-  if (pushButtonValues[1]){
-    Serial.println("Flower button pushed");
-    machineFlowerState = STATE_FLOWER_UP;
-  }
-  if (pushButtonValues[2]){
-    Serial.println("Shroom button pushed");
-    machineShroomVerState = STATE_SHROOM_UP;
-  }
-  delay(1000);
-}
-
-/*
-   void readCoinSensors(){
-   digitalRead(COIN_PUSH_PIN);
-   };
-
-   void readFlowerSensors(){
-   digitalRead(FLOWER_PUSH_PIN);
-   };
- */
-
-void readShroomSensors(){
-  digitalRead(SHROOM_PUSH_PIN);
-};
-
-void handleCoinState(){
-  switch(machineCoinState){
-    case STATE_COIN_UP:
-      break;
-    case STATE_COIN_DOWN:
-      break;
-    default:
-      //do nothing
-      break;
-  }
-};
-
-void handleFlowerState(){
-  switch(machineFlowerState){
-    case STATE_FLOWER_UP:
-      break;
-    case STATE_FLOWER_DOWN:
-      break;
-    default:
-      //do nothing
-      break;
-  }
-};
-
-void handleShroomState(){
-  switch(machineShroomVerState){
-    case STATE_SHROOM_UP:
-      break;
-    case STATE_SHROOM_DOWN:
-      break;
-    default:
-      break;
-  }
-  switch(machineShroomHorState){  
-    case STATE_SHROOM_LEFT:
-      break;
-    case STATE_SHROOM_RIGHT:
-      break;
-    default:
-      break;
-  }
-};
-
-void setCoinMotor( bool direction ){
-  digitalWrite(COIN_PUSH_PIN, direction);
-}
-
+//void handlePushButtonState(){
+//  if (pushButtonValues[0] > 512 ){ 
+//    Serial.println("Coin button pushed");
+//    machineCoinState = STATE_COIN_UP;
+//  }
+//  if (pushButtonValues[1]){
+//    Serial.println("Flower button pushed");
+//    machineFlowerState = STATE_FLOWER_UP;
+//  }
+//  if (pushButtonValues[2]){
+//    Serial.println("Shroom button pushed");
+//    machineShroomVerState = STATE_SHROOM_UP;
+//  }
+//  delay(1000);
+//}
+//
+//
+//void readShroomSensors(){
+//  digitalRead(SHROOM_PUSH_PIN);
+//};
+//
 
